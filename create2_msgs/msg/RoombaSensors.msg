@@ -1,0 +1,20 @@
+Header header
+
+BumpsWheeldrops       bumps_wheeldrops
+Wall                  wall
+Cliff                 cliff
+WheelOvercurrents     wheel_overcurrents
+uint8                 dirt_detect
+IR_Opcodes            ir_opcodes
+Button                button
+Travel                travel
+Battery               battery
+ChargingSource        charging_source
+uint8                 oi_mode
+Song                  song
+uint8                 stream_packets
+Request               request
+EncoderCounts         encoder_counts
+LightBumper           light_bumper
+MotorCurrent          motor_current
+bool                  stasis

@@ -1,0 +1,12 @@
+bool left
+bool front_left
+bool center_left
+bool center_right
+bool front_right
+bool right
+uint16 left_signal
+uint16 front_left_signal
+uint16 center_left_signal
+uint16 center_right_signal
+uint16 front_right_signal
+uint16 right_signal
