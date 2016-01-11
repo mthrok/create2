@@ -8,17 +8,16 @@ class Serial {
 
 private:
   int fd_;
-  struct termios oldtio_;
-
 public:
   Serial();
   ~Serial();
 
-  void init(const int baudrate=B115200,
+  void open(const int baudrate=B115200,
             const char* device="/dev/ttyUSB0");
+  void close();
   int read(uint8_t* pBuffer, int len);
   int write(const uint8_t* pData, int len);
-  void setRts(int);
+  //void setRts(int);
 };
 
 #endif // CREATE2_DRIVER_SERIAL_HPP

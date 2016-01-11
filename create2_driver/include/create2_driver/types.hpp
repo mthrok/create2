@@ -40,7 +40,7 @@ namespace create2 {
     OC_DRIVE_PWM     = 146, // (+4 bytes)
     OC_STREAM        = 148, // (+N+1 bytes)
     OC_QUERY_LIST    = 149, // (+N+1 bytes)
-    OC_TOGGLE_STREAM = 150, // (+1 bytes)
+    OC_PAUSE_STREAM  = 150, // (+1 bytes)
 
     OC_SCHEDULING_LEDS  = 162, // (+2 bytes)
     OC_DIGIT_LEDS_RAW   = 163, // (+4 bytes)

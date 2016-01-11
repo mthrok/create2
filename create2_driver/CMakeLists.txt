@@ -11,7 +11,7 @@ catkin_package(
   INCLUDE_DIRS    include
   LIBRARIES       create2_driver
   CATKIN_DEPENDS  create2_msgs roscpp tf
-  DEPENDS         system_lib
+  DEPENDS         system_lib boost_thread
 )
 
 include_directories(
@@ -34,5 +34,6 @@ add_dependencies(create2_node
 
 target_link_libraries(create2_node
   create2_driver
+  boost_thread
   ${catkin_LIBRARIES}
 )
