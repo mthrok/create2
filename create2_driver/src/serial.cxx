@@ -16,7 +16,7 @@ void Serial::open(const int baudrate, const char* device) {
   }
 
   struct termios toptions;
-  fd_ = ::open(device, O_RDWR | O_NOCTTY | O_NDELAY );
+  fd_ = ::open(device, O_RDWR | O_NOCTTY);
   if (fd_ == -1)  {
     std::runtime_error("Failed to open device.");
   }
@@ -37,8 +37,8 @@ void Serial::open(const int baudrate, const char* device) {
   toptions.c_iflag &= ~(IXON | IXOFF | IXANY);
   toptions.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
   toptions.c_oflag &= ~OPOST;
-  toptions.c_cc[VMIN]  = 0;
-  toptions.c_cc[VTIME] = 1;
+  toptions.c_cc[VMIN]  = 1;
+  toptions.c_cc[VTIME] = 0;
   if(tcsetattr(fd_, TCSANOW, &toptions) < 0) {
     std::runtime_error("Failed to set term term attributes.");
   }

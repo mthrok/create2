@@ -213,19 +213,34 @@ create2::SerialReader::SerialReader(Serial& serial)
   , running_(false)
   , status_()
   , status_mutex_()
+  , total(0)
+  , success(0)
+  , body_error(0)
+  , checksum_error(0)
 {}
 
-create2::SerialReader::~SerialReader() {};
+create2::SerialReader::~SerialReader() {
+  std::cout
+    << "SreialReader Summary:\n"
+    << "  ERROR(  Body  ): " << body_error << "\n"
+    << "  ERROR(Checksum): " << checksum_error << "\n"
+    << "          SUCCESS: " << success << "\n"
+    << "            TOTAL: " << total << std::endl;
+};
 
 void create2::SerialReader::start() {
-  running_ = true;
-  thread_ = boost::thread(
-    &create2::SerialReader::continuouslyUpdateStatus, this);
+  if (!running_) {
+    running_ = true;
+    thread_ = boost::thread(
+      &create2::SerialReader::continuouslyUpdateStatus, this);
+  }
 };
 
 void create2::SerialReader::stop() {
-  running_ = false;
-  thread_.join();
+  if (running_) {
+    running_ = false;
+    thread_.join();
+  }
 }
 
 create2_msgs::RoombaSensors create2::SerialReader::status() {
@@ -233,31 +248,63 @@ create2_msgs::RoombaSensors create2::SerialReader::status() {
   return status_.getStatus();
 }
 
-void create2::SerialReader::updateStatus() {
-  uint8_t rawStatus[84];
-  if (serial_.read(rawStatus, 84) != 84) {
-    return;
+bool create2::SerialReader::updateStatus() {
+  int read;
+  uint8_t header, size, checksum;
+  read = serial_.read(&header, 1);
+  if (!(read == 1 && header == 19)) {
+    return false;
   }
-  uint8_t checksum = 0;
-  for (uint8_t i = 0; i < 84; ++i) {
-    checksum += rawStatus[i];
+  ++total;
+  if (1 != serial_.read(&size, 1)) {
+    return false;
+  }
+  std::vector<uint8_t> body(size);
+  if (size != serial_.read(&body.front(), size)) {
+    ++body_error;
+    return false;
+  }
+  if (1 != serial_.read(&checksum, 1)) {
+    return false;
+  }
+  checksum += header + size;
+  for (uint8_t i = 0; i < size; ++i) {
+    checksum += body[i];
   }
   if (checksum != 0) {
-    return;
+    ++checksum_error;
+    return false;
   }
-  status_.update(rawStatus+3);
-  std::cout << "*" << std::flush;
-  //std::cout << status_.toString();
+  for (uint8_t i = 0; i < size; ) {
+    int packetId = body[i++];
+    switch(packetId) {
+    case 100:
+      status_.update(&body[i]);
+      i += 80;
+      ++success;
+      // std::cout << "*" << std::flush;
+      // std::cout << status_.toString() << std::flush;
+      break;
+    default:
+      std::cerr << "NOT IMPLEMENTED: " << packetId << "\n";
+    }
+  }
+  return true;
 }
 
 void create2::SerialReader::continuouslyUpdateStatus() {
-  boost::chrono::milliseconds interval(33);
+  boost::chrono::milliseconds interval(5);
   while(running_) {
+    bool success = false;
     if (status_mutex_.try_lock()) {
-      updateStatus();
+      success = updateStatus();
       status_mutex_.unlock();
     }
-    boost::this_thread::sleep_for(interval);
+    if (success) {
+      boost::this_thread::sleep_for(3 * interval);
+    } else {
+      boost::this_thread::sleep_for(interval);
+    }
   }
 }
 
@@ -309,14 +356,18 @@ create2::SerialWriter::SerialWriter(Serial& serial)
 create2::SerialWriter::~SerialWriter() {};
 
 void create2::SerialWriter::start() {
-  running_ = true;
-  thread_ = boost::thread(
-    &create2::SerialWriter::continuouslyProcessCommand, this);
+  if (!running_) {
+    running_ = true;
+    thread_ = boost::thread(
+      &create2::SerialWriter::continuouslyProcessCommand, this);
+  }
 }
 
 void create2::SerialWriter::stop() {
-  running_ = false;
-  thread_.join();
+  if (running_) {
+    running_ = false;
+    thread_.join();
+  }
 }
 
 void create2::SerialWriter::queueCommand(
@@ -331,14 +382,14 @@ void create2::SerialWriter::processCommand() {
     uint32_t size = command.size();
     const uint8_t* data = command.data();
     if (serial_.write(data, size) != (int32_t) size) {
-      std::cerr << "Failed to send Opcode." << std::endl;
+      std::cerr << "Failed to process: " << (int)data[0] << std::endl;
     }
     commands_.pop_front();
   }
 }
 
 void create2::SerialWriter::continuouslyProcessCommand() {
-  boost::chrono::milliseconds interval(33);
+  boost::chrono::milliseconds interval(14);
   while(running_) {
     if (command_mutex_.try_lock()) {
       processCommand();
@@ -382,10 +433,15 @@ create2::Create2::Create2()
   : comm_()
 {};
 
-create2::Create2::~Create2() {};
+create2::Create2::~Create2() {
+  stopStream();
+  passive();
+  comm_.stop();
+};
 
 void create2::Create2::init(const int baudrate, const char* device) {
   comm_.init(baudrate, device);
+  comm_.start();
 };
 
 void create2::Create2::startStream() {
@@ -402,26 +458,28 @@ void create2::Create2::passive() {
   comm_.queueCommand(OC_START);
 }
 
+void create2::Create2::safe() {
+  comm_.queueCommand(OC_SAFE);
+}
+
 void create2::Create2::full() {
   comm_.queueCommand(OC_FULL);
 }
 
 void create2::Create2::start() {
-  comm_.start();
   passive();
-  sleep_for_sec(1);
   startStream();
-  sleep_for_sec(1);
 }
 
 void create2::Create2::stop() {
+  stopStream();
   passive();
-  comm_.stop();
 }
 
-void create2::Create2::reset() {
+void create2::Create2::restart() {
   comm_.queueCommand(OC_RESET);
-  sleep_for_sec(5);
+  sleep_for_sec(3.5);
+  start();
 }
 
 void create2::Create2::test() {
@@ -429,7 +487,7 @@ void create2::Create2::test() {
 
   std::cout << "[TEST] Entering FULL mode." << std::endl;
   full();
-  sleep_for_sec(3);
+  sleep_for_sec(1);
 
   std::cout << "[TEST] Entering PASSIVE mode." << std::endl;
   passive();
@@ -437,14 +495,15 @@ void create2::Create2::test() {
 
   std::cout << "[TEST] Stopping stream." << std::endl;
   stopStream();
-  sleep_for_sec(7);
-
-  std::cout << "[TEST] Restarting stream." << std::endl;
-  startStream();
   sleep_for_sec(3);
 
-  std::cout << "[TEST] Resetting." << std::endl;
-  reset();
+  std::cout << "[TEST] Resuming stream." << std::endl;
+  startStream();
+  sleep_for_sec(1);
+
+  std::cout << "[TEST] Resetarting." << std::endl;
+  restart();
+  sleep_for_sec(1);
 
   stop();
 }

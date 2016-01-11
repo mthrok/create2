@@ -39,7 +39,9 @@ class create2::SerialReader {
   Status status_;
   boost::mutex status_mutex_;
 
-  void updateStatus();
+  uint32_t total, success, body_error, checksum_error;  // For debugging
+
+  bool updateStatus();
   void continuouslyUpdateStatus();
 public:
   SerialReader(Serial& serial);
@@ -118,12 +120,13 @@ public:
 
   void start();
   void stop();
-  void reset();
+  void restart();
 
   void startStream();
   void stopStream();
 
   void passive();
+  void safe();
   void full();
 
   void test();
