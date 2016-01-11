@@ -237,10 +237,12 @@ void create2::SerialReader::start() {
 };
 
 void create2::SerialReader::stop() {
+  std::cout << "Waiting for SerialReader to stop." << std::endl;
   if (running_) {
     running_ = false;
     thread_.join();
   }
+  std::cout << "SerialReader stopped." << std::endl;
 }
 
 create2_msgs::RoombaSensors create2::SerialReader::status() {
@@ -293,18 +295,14 @@ bool create2::SerialReader::updateStatus() {
 }
 
 void create2::SerialReader::continuouslyUpdateStatus() {
-  boost::chrono::milliseconds interval(5);
+  boost::chrono::milliseconds interval(3);
   while(running_) {
-    bool success = false;
-    if (status_mutex_.try_lock()) {
+    bool success = status_mutex_.try_lock();
+    if (success) {
       success = updateStatus();
       status_mutex_.unlock();
     }
-    if (success) {
-      boost::this_thread::sleep_for(3 * interval);
-    } else {
-      boost::this_thread::sleep_for(interval);
-    }
+    boost::this_thread::sleep_for(success ? 5 * interval : interval);
   }
 }
 
@@ -364,10 +362,13 @@ void create2::SerialWriter::start() {
 }
 
 void create2::SerialWriter::stop() {
+  std::cout << "Waiting for SerialWriter to stop." << std::endl;
   if (running_) {
     running_ = false;
     thread_.join();
+    clearCommands();
   }
+  std::cout << "SerialWriter stopped." << std::endl;
 }
 
 void create2::SerialWriter::queueCommand(
@@ -376,7 +377,12 @@ void create2::SerialWriter::queueCommand(
   commands_.push_back(Command(code, data, datasize));
 };
 
-void create2::SerialWriter::processCommand() {
+void create2::SerialWriter::clearCommands() {
+  boost::lock_guard<boost::mutex> lock(command_mutex_);
+  commands_.clear();
+}
+
+bool create2::SerialWriter::processCommand() {
   if (commands_.size()) {
     Command& command = commands_[0];
     uint32_t size = command.size();
@@ -385,17 +391,20 @@ void create2::SerialWriter::processCommand() {
       std::cerr << "Failed to process: " << (int)data[0] << std::endl;
     }
     commands_.pop_front();
+    return true;
   }
+  return false;
 }
 
 void create2::SerialWriter::continuouslyProcessCommand() {
-  boost::chrono::milliseconds interval(14);
+  boost::chrono::milliseconds interval(3);
   while(running_) {
-    if (command_mutex_.try_lock()) {
-      processCommand();
+    bool success = command_mutex_.try_lock();
+    if (success) {
+      success = processCommand();
       command_mutex_.unlock();
     }
-    boost::this_thread::sleep_for(interval);
+    boost::this_thread::sleep_for(success? 5 * interval : interval);
   }
 }
 
@@ -429,13 +438,16 @@ void create2::Communicator::queueCommand(
   writer_.queueCommand(code, pData, size);
 }
 
+void create2::Communicator::clearCommands() {
+  writer_.clearCommands();
+}
+
 create2::Create2::Create2()
   : comm_()
 {};
 
 create2::Create2::~Create2() {
-  stopStream();
-  passive();
+  stop();
   comm_.stop();
 };
 
@@ -453,6 +465,34 @@ void create2::Create2::stopStream() {
   uint8_t data[] = {0};
   comm_.queueCommand(OC_PAUSE_STREAM, data, 1);
 }
+
+void create2::Create2::drive(const short velocity, const short radius) {
+  /**
+     velocity: -500 ~ 500 [mm/s]
+     radius: -2000 ~ 2000 [mm]
+   **/
+  uint8_t data[4] = {
+    (uint8_t)(velocity >> 8),
+    (uint8_t)(velocity & 0xff),
+    (uint8_t)(radius >> 8),
+    (uint8_t)(radius & 0xff)
+  };
+  comm_.queueCommand(OC_DRIVE, data, 4);
+}
+
+void create2::Create2::driveDirect(const short right, const short left) {
+  /**
+     right/left: -500 ~ 500 [mm/s]
+   **/
+  uint8_t data[4] = {
+    (uint8_t)(right >> 8),
+    (uint8_t)(right & 0xff),
+    (uint8_t)(left >> 8),
+    (uint8_t)(left & 0xff)
+  };
+  comm_.queueCommand(OC_DRIVE_DIRECT, data, 4);
+}
+
 
 void create2::Create2::passive() {
   comm_.queueCommand(OC_START);
@@ -472,8 +512,12 @@ void create2::Create2::start() {
 }
 
 void create2::Create2::stop() {
+  comm_.clearCommands();
+  full();
+  driveDirect(0, 0);  // Make this more dynamic
   stopStream();
   passive();
+  sleep_for_sec(1.0);
 }
 
 void create2::Create2::restart() {
@@ -487,23 +531,39 @@ void create2::Create2::test() {
 
   std::cout << "[TEST] Entering FULL mode." << std::endl;
   full();
-  sleep_for_sec(1);
 
-  std::cout << "[TEST] Entering PASSIVE mode." << std::endl;
-  passive();
-  sleep_for_sec(1);
+  std::cout << "[TEST] driving." << std::endl;
+  for (int i = 0; i < 120; ++i) {
+    drive(30, 0);
+  }
+  for (int i = 0; i < 120; ++i) {
+    drive(-30, 0);
+  }
+  for (int i = 0; i < 120; ++i) {
+    driveDirect(-100, 100);
+  }
+  for (int i = 0; i < 120; ++i) {
+    driveDirect(100, -100);
+  }
 
-  std::cout << "[TEST] Stopping stream." << std::endl;
-  stopStream();
-  sleep_for_sec(3);
+  driveDirect(0, 0);
+  sleep_for_sec(60);
 
-  std::cout << "[TEST] Resuming stream." << std::endl;
-  startStream();
-  sleep_for_sec(1);
+  // std::cout << "[TEST] Entering PASSIVE mode." << std::endl;
+  // passive();
+  // sleep_for_sec(1);
 
-  std::cout << "[TEST] Resetarting." << std::endl;
-  restart();
-  sleep_for_sec(1);
+  // std::cout << "[TEST] Stopping stream." << std::endl;
+  // stopStream();
+  // sleep_for_sec(3);
+
+  // std::cout << "[TEST] Resuming stream." << std::endl;
+  // startStream();
+  // sleep_for_sec(1);
+
+  // std::cout << "[TEST] Resetarting." << std::endl;
+  // restart();
+  // sleep_for_sec(1);
 
   stop();
 }

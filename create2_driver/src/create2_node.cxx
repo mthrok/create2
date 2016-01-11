@@ -5,6 +5,6 @@ int main() {
   c2.init();
   c2.start();
   c2.test();
-  c2.stop();
+  //c2.stop();
   return 0;
 }

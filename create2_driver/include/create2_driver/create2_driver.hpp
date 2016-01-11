@@ -77,7 +77,7 @@ class create2::SerialWriter {
   std::deque<Command> commands_;
   boost::mutex command_mutex_;
 
-  void processCommand();
+  bool processCommand();
   void continuouslyProcessCommand();
 public:
   SerialWriter(Serial& serial);
@@ -89,6 +89,8 @@ public:
   void queueCommand(const OPCODE code,
                     const uint8_t* data=NULL,
                     const uint32_t datasize=0);
+
+  void clearCommands();
 };
 
 class create2::Communicator {
@@ -107,6 +109,7 @@ public:
   void queueCommand(const OPCODE code,
                     const uint8_t* data=NULL,
                     const uint32_t size=0);
+  void clearCommands();
 };
 
 class create2::Create2 {
@@ -128,6 +131,9 @@ public:
   void passive();
   void safe();
   void full();
+
+  void drive(const short velocity, const short radius=0);
+  void driveDirect(const short right, const short left);
 
   void test();
 };
