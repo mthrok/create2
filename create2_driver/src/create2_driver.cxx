@@ -406,6 +406,11 @@ void create2::SerialWriter::continuouslyProcessCommand() {
     }
     boost::this_thread::sleep_for(success? 5 * interval : interval);
   }
+  // Flush the remaining commands
+  boost::lock_guard<boost::mutex> lock(command_mutex_);
+  while(commands_.size()) {
+    processCommand();
+  }
 }
 
 create2::Communicator::Communicator()
@@ -515,9 +520,8 @@ void create2::Create2::stop() {
   comm_.clearCommands();
   full();
   driveDirect(0, 0);  // Make this more dynamic
-  stopStream();
   passive();
-  sleep_for_sec(1.0);
+  stopStream();
 }
 
 void create2::Create2::restart() {
@@ -545,9 +549,7 @@ void create2::Create2::test() {
   for (int i = 0; i < 120; ++i) {
     driveDirect(100, -100);
   }
-
-  driveDirect(0, 0);
-  sleep_for_sec(60);
+  sleep_for_sec(1);
 
   // std::cout << "[TEST] Entering PASSIVE mode." << std::endl;
   // passive();
