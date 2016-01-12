@@ -232,7 +232,7 @@ void create2::SerialReader::start() {
   if (!running_) {
     running_ = true;
     thread_ = boost::thread(
-      &create2::SerialReader::continuouslyUpdateStatus, this);
+      &create2::SerialReader::updateStatusContinuously, this);
   }
 };
 
@@ -294,7 +294,7 @@ bool create2::SerialReader::updateStatus() {
   return true;
 }
 
-void create2::SerialReader::continuouslyUpdateStatus() {
+void create2::SerialReader::updateStatusContinuously() {
   boost::chrono::milliseconds interval(3);
   while(running_) {
     bool success = status_mutex_.try_lock();
@@ -357,7 +357,7 @@ void create2::SerialWriter::start() {
   if (!running_) {
     running_ = true;
     thread_ = boost::thread(
-      &create2::SerialWriter::continuouslyProcessCommand, this);
+      &create2::SerialWriter::processCommandContinuously, this);
   }
 }
 
@@ -382,26 +382,29 @@ void create2::SerialWriter::clearCommands() {
   commands_.clear();
 }
 
-bool create2::SerialWriter::processCommand() {
+void create2::SerialWriter::processCommand(const Command& command) {
+  uint32_t size = command.size();
+  const uint8_t* data = command.data();
+  if (serial_.write(data, size) != (int32_t) size) {
+    std::cerr << "Failed to process: " << (int)data[0] << std::endl;
+  }
+};
+
+bool create2::SerialWriter::processNextCommand() {
   if (commands_.size()) {
-    Command& command = commands_[0];
-    uint32_t size = command.size();
-    const uint8_t* data = command.data();
-    if (serial_.write(data, size) != (int32_t) size) {
-      std::cerr << "Failed to process: " << (int)data[0] << std::endl;
-    }
+    processCommand(commands_[0]);
     commands_.pop_front();
     return true;
   }
   return false;
 }
 
-void create2::SerialWriter::continuouslyProcessCommand() {
+void create2::SerialWriter::processCommandContinuously() {
   boost::chrono::milliseconds interval(3);
   while(running_) {
     bool success = command_mutex_.try_lock();
     if (success) {
-      success = processCommand();
+      success = processNextCommand();
       command_mutex_.unlock();
     }
     boost::this_thread::sleep_for(success? 5 * interval : interval);
@@ -409,7 +412,7 @@ void create2::SerialWriter::continuouslyProcessCommand() {
   // Flush the remaining commands
   boost::lock_guard<boost::mutex> lock(command_mutex_);
   while(commands_.size()) {
-    processCommand();
+    processNextCommand();
   }
 }
 
@@ -443,6 +446,11 @@ void create2::Communicator::queueCommand(
   writer_.queueCommand(code, pData, size);
 }
 
+void create2::Communicator::queueCommand(
+    const OPCODE code, const uint8_t data) {
+  writer_.queueCommand(code, &data, 1);
+};
+
 void create2::Communicator::clearCommands() {
   writer_.clearCommands();
 }
@@ -467,8 +475,7 @@ void create2::Create2::startStream() {
 }
 
 void create2::Create2::stopStream() {
-  uint8_t data[] = {0};
-  comm_.queueCommand(OC_PAUSE_STREAM, data, 1);
+  comm_.queueCommand(OC_PAUSE_STREAM, (uint8_t)0);
 }
 
 void create2::Create2::drive(const short velocity, const short radius) {
@@ -524,19 +531,13 @@ void create2::Create2::stop() {
   stopStream();
 }
 
-void create2::Create2::restart() {
+void create2::Create2::reset() {
   comm_.queueCommand(OC_RESET);
-  sleep_for_sec(3.5);
-  start();
 }
 
-void create2::Create2::test() {
-  start();
-
-  std::cout << "[TEST] Entering FULL mode." << std::endl;
+void create2::Create2::testDrive() {
+  std::cout << "[TEST] Testing drive." << std::endl;
   full();
-
-  std::cout << "[TEST] driving." << std::endl;
   for (int i = 0; i < 120; ++i) {
     drive(30, 0);
   }
@@ -549,23 +550,37 @@ void create2::Create2::test() {
   for (int i = 0; i < 120; ++i) {
     driveDirect(100, -100);
   }
-  sleep_for_sec(1);
+  sleep_for_sec(4);
+}
 
-  // std::cout << "[TEST] Entering PASSIVE mode." << std::endl;
-  // passive();
-  // sleep_for_sec(1);
+void create2::Create2::testStream() {
+  std::cout << "[TEST] Testing Stream pause/resume." << std::endl;
+  passive();
 
-  // std::cout << "[TEST] Stopping stream." << std::endl;
-  // stopStream();
-  // sleep_for_sec(3);
+  std::cout << "[TEST] Start stream." << std::endl;
+  startStream();
+  sleep_for_sec(5);
 
-  // std::cout << "[TEST] Resuming stream." << std::endl;
-  // startStream();
-  // sleep_for_sec(1);
+  std::cout << "[TEST] Pause stream." << std::endl;
+  stopStream();
+  sleep_for_sec(5);
 
-  // std::cout << "[TEST] Resetarting." << std::endl;
-  // restart();
-  // sleep_for_sec(1);
+  std::cout << "[TEST] Resume stream." << std::endl;
+  startStream();
+  sleep_for_sec(5);
+}
 
+void create2::Create2::testRestart() {
+  std::cout << "[TEST] Resetarting." << std::endl;
+  reset();
+  sleep_for_sec(3.5);
+  start();
+}
+
+void create2::Create2::test() {
+  start();
+  // testStream();
+  // testRestart();
+  testDrive();
   stop();
 }

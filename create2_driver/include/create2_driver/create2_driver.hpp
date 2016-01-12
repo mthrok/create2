@@ -42,7 +42,7 @@ class create2::SerialReader {
   uint32_t total, success, body_error, checksum_error;  // For debugging
 
   bool updateStatus();
-  void continuouslyUpdateStatus();
+  void updateStatusContinuously();
 public:
   SerialReader(Serial& serial);
   ~SerialReader();
@@ -77,8 +77,9 @@ class create2::SerialWriter {
   std::deque<Command> commands_;
   boost::mutex command_mutex_;
 
-  bool processCommand();
-  void continuouslyProcessCommand();
+  void processCommand(const Command& command);
+  bool processNextCommand();
+  void processCommandContinuously();
 public:
   SerialWriter(Serial& serial);
   ~SerialWriter();
@@ -109,6 +110,9 @@ public:
   void queueCommand(const OPCODE code,
                     const uint8_t* data=NULL,
                     const uint32_t size=0);
+  void queueCommand(const OPCODE code,
+                    const uint8_t data);
+
   void clearCommands();
 };
 
@@ -123,7 +127,7 @@ public:
 
   void start();
   void stop();
-  void restart();
+  void reset();
 
   void startStream();
   void stopStream();
@@ -136,4 +140,8 @@ public:
   void driveDirect(const short right, const short left);
 
   void test();
+  void testDrive();
+  void testStream();
+  void testRestart();
+
 };
