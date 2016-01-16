@@ -446,6 +446,10 @@ void create2::Communicator::flushCommands() {
   writer_.flushCommands();
 }
 
+create2_msgs::RoombaSensors create2::Communicator::getStatus() {
+  return reader_.status();
+}
+
 create2::Create2::Create2()
   : comm_()
 {};
@@ -523,6 +527,10 @@ void create2::Create2::stop(bool block) {
 
 void create2::Create2::reset() {
   comm_.queueCommand(OC_RESET);
+}
+
+create2_msgs::RoombaSensors create2::Create2::getStatus() {
+  return comm_.getStatus();
 }
 
 void create2::Create2::testDrive() {

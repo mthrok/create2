@@ -10,8 +10,6 @@
 
 #include <create2_msgs/RoombaSensors.h>
 
-using namespace create2;
-
 namespace create2 {
   class Status;
   class Command;
@@ -27,7 +25,6 @@ class create2::Status {
   create2_msgs::RoombaSensors status_;
 public:
   void update(uint8_t rawStatus[80]);
-
   std::string toString() const;
   create2_msgs::RoombaSensors getStatus() const;
 };
@@ -110,6 +107,8 @@ public:
 
   void clearCommands();
   void flushCommands();
+
+  create2_msgs::RoombaSensors getStatus();
 };
 
 class create2::Create2 {
@@ -134,6 +133,8 @@ public:
 
   void drive(const short velocity, const short radius=0);
   void driveDirect(const short right, const short left);
+
+  create2_msgs::RoombaSensors getStatus();
 
   void test();
   void testDrive();
