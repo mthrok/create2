@@ -54,17 +54,11 @@ public:
 };
 
 class create2::Command {
-  uint32_t size_;
-  uint8_t* data_;
+  std::vector<uint8_t> data_;
 public:
   Command(const OPCODE code,
           const uint8_t* data=NULL,
           const uint32_t datasize=0);
-  Command(const Command& command);
-  Command& operator=(Command command);
-
-  friend void swap(Command& c1, Command& c2);
-  ~Command();
 
   const uint8_t* data() const;
   uint32_t size() const;
@@ -92,6 +86,7 @@ public:
                     const uint32_t datasize=0);
 
   void clearCommands();
+  void flushCommands();
 };
 
 class create2::Communicator {
@@ -114,6 +109,7 @@ public:
                     const uint8_t data);
 
   void clearCommands();
+  void flushCommands();
 };
 
 class create2::Create2 {
@@ -126,7 +122,7 @@ public:
             const char* device="/dev/ttyUSB0");
 
   void start();
-  void stop();
+  void stop(bool block=false);
   void reset();
 
   void startStream();

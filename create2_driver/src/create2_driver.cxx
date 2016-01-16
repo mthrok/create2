@@ -220,6 +220,7 @@ create2::SerialReader::SerialReader(Serial& serial)
 {}
 
 create2::SerialReader::~SerialReader() {
+  stop();
   std::cout
     << "SreialReader Summary:\n"
     << "  ERROR(  Body  ): " << body_error << "\n"
@@ -230,19 +231,21 @@ create2::SerialReader::~SerialReader() {
 
 void create2::SerialReader::start() {
   if (!running_) {
+    std::cout << "Starting SerialReader." << std::endl;
     running_ = true;
     thread_ = boost::thread(
       &create2::SerialReader::updateStatusContinuously, this);
+    std::cout << "SerialReader started." << std::endl;
   }
 };
 
 void create2::SerialReader::stop() {
-  std::cout << "Waiting for SerialReader to stop." << std::endl;
   if (running_) {
+    std::cout << "Waiting for SerialReader to stop." << std::endl;
     running_ = false;
     thread_.join();
+    std::cout << "SerialReader stopped." << std::endl;
   }
-  std::cout << "SerialReader stopped." << std::endl;
 }
 
 create2_msgs::RoombaSensors create2::SerialReader::status() {
@@ -306,42 +309,19 @@ void create2::SerialReader::updateStatusContinuously() {
   }
 }
 
-create2::Command::Command(const OPCODE code, const uint8_t* data, const uint32_t size)
-  : size_(size + 1)
-  , data_(new uint8_t[size_])
+create2::Command::Command(const OPCODE code, const uint8_t* data, const uint32_t datasize)
+  : data_(datasize + 1)
 {
   data_[0] = (uint8_t) code;
-  memcpy(data_+1, data, size);
-}
-
-create2::Command::Command(const Command& command)
-  : size_(command.size_)
-  , data_(new uint8_t[size_])
-{
-  memcpy(data_, command.data_, size_);
-};
-
-create2::Command& create2::Command::operator=(Command other) {
-  create2::swap(*this, other);
-  return *this;
-}
-
-void create2::swap(Command& c1, Command& c2) {
-  using std::swap;
-  swap(c1.size_, c2.size_);
-  swap(c1.data_, c2.data_);
-}
-
-create2::Command::~Command() {
-  delete[] data_;
+  memcpy(&data_[1], data, datasize);
 }
 
 const uint8_t* create2::Command::data() const {
-  return data_;
+  return &data_[0];
 }
 
 uint32_t create2::Command::size() const {
-  return size_;
+  return data_.size();
 }
 
 create2::SerialWriter::SerialWriter(Serial& serial)
@@ -351,24 +331,27 @@ create2::SerialWriter::SerialWriter(Serial& serial)
   , commands_()
 {}
 
-create2::SerialWriter::~SerialWriter() {};
+create2::SerialWriter::~SerialWriter() {
+  stop();
+};
 
 void create2::SerialWriter::start() {
   if (!running_) {
+    std::cout << "Starting SerialWriter." << std::endl;
     running_ = true;
     thread_ = boost::thread(
       &create2::SerialWriter::processCommandContinuously, this);
+    std::cout << "SerialWriter started." << std::endl;
   }
 }
 
 void create2::SerialWriter::stop() {
-  std::cout << "Waiting for SerialWriter to stop." << std::endl;
   if (running_) {
+    std::cout << "Waiting for SerialWriter to stop." << std::endl;
     running_ = false;
     thread_.join();
-    clearCommands();
+    std::cout << "SerialWriter stopped." << std::endl;
   }
-  std::cout << "SerialWriter stopped." << std::endl;
 }
 
 void create2::SerialWriter::queueCommand(
@@ -385,18 +368,27 @@ void create2::SerialWriter::clearCommands() {
 void create2::SerialWriter::processCommand(const Command& command) {
   uint32_t size = command.size();
   const uint8_t* data = command.data();
+  std::cout << "command: " << (int)data[0] << std::endl;
   if (serial_.write(data, size) != (int32_t) size) {
     std::cerr << "Failed to process: " << (int)data[0] << std::endl;
   }
 };
 
 bool create2::SerialWriter::processNextCommand() {
+  // Make sure that command_mutes_ is locked by caller thread.
   if (commands_.size()) {
     processCommand(commands_[0]);
     commands_.pop_front();
     return true;
   }
   return false;
+}
+
+void create2::SerialWriter::flushCommands() {
+  boost::lock_guard<boost::mutex> lock(command_mutex_);
+  while(commands_.size()) {
+    processNextCommand();
+  }
 }
 
 void create2::SerialWriter::processCommandContinuously() {
@@ -409,11 +401,6 @@ void create2::SerialWriter::processCommandContinuously() {
     }
     boost::this_thread::sleep_for(success? 5 * interval : interval);
   }
-  // Flush the remaining commands
-  boost::lock_guard<boost::mutex> lock(command_mutex_);
-  while(commands_.size()) {
-    processNextCommand();
-  }
 }
 
 create2::Communicator::Communicator()
@@ -423,7 +410,7 @@ create2::Communicator::Communicator()
 {}
 
 create2::Communicator::~Communicator() {
-  serial_.close();
+  stop();
 };
 
 void create2::Communicator::init(
@@ -455,13 +442,16 @@ void create2::Communicator::clearCommands() {
   writer_.clearCommands();
 }
 
+void create2::Communicator::flushCommands() {
+  writer_.flushCommands();
+}
+
 create2::Create2::Create2()
   : comm_()
 {};
 
 create2::Create2::~Create2() {
-  stop();
-  comm_.stop();
+  stop(true);
 };
 
 void create2::Create2::init(const int baudrate, const char* device) {
@@ -505,7 +495,6 @@ void create2::Create2::driveDirect(const short right, const short left) {
   comm_.queueCommand(OC_DRIVE_DIRECT, data, 4);
 }
 
-
 void create2::Create2::passive() {
   comm_.queueCommand(OC_START);
 }
@@ -523,12 +512,13 @@ void create2::Create2::start() {
   startStream();
 }
 
-void create2::Create2::stop() {
+void create2::Create2::stop(bool block) {
   comm_.clearCommands();
-  full();
-  driveDirect(0, 0);  // Make this more dynamic
-  passive();
   stopStream();
+  passive();
+  if (block) {
+    comm_.flushCommands();
+  }
 }
 
 void create2::Create2::reset() {
