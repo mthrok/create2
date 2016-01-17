@@ -203,7 +203,7 @@ std::string create2::Status::toString() const {
   return ss.str();
 }
 
-create2_msgs::RoombaSensors create2::Status::getStatus() const {
+create2_msgs::Status create2::Status::getStatus() const {
   return status_;
 }
 
@@ -248,7 +248,7 @@ void create2::SerialReader::stop() {
   }
 }
 
-create2_msgs::RoombaSensors create2::SerialReader::status() {
+create2_msgs::Status create2::SerialReader::status() {
   boost::lock_guard<boost::mutex> lock(status_mutex_);
   return status_.getStatus();
 }
@@ -446,7 +446,7 @@ void create2::Communicator::flushCommands() {
   writer_.flushCommands();
 }
 
-create2_msgs::RoombaSensors create2::Communicator::getStatus() {
+create2_msgs::Status create2::Communicator::getStatus() {
   return reader_.status();
 }
 
@@ -529,7 +529,7 @@ void create2::Create2::reset() {
   comm_.queueCommand(OC_RESET);
 }
 
-create2_msgs::RoombaSensors create2::Create2::getStatus() {
+create2_msgs::Status create2::Create2::getStatus() {
   return comm_.getStatus();
 }
 

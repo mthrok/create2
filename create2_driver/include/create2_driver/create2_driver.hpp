@@ -8,7 +8,7 @@
 #include "create2_driver/types.hpp"
 #include "create2_driver/serial.hpp"
 
-#include <create2_msgs/RoombaSensors.h>
+#include <create2_msgs/Status.h>
 
 namespace create2 {
   class Status;
@@ -22,11 +22,11 @@ namespace create2 {
 };
 
 class create2::Status {
-  create2_msgs::RoombaSensors status_;
+  create2_msgs::Status status_;
 public:
   void update(uint8_t rawStatus[80]);
   std::string toString() const;
-  create2_msgs::RoombaSensors getStatus() const;
+  create2_msgs::Status getStatus() const;
 };
 
 class create2::SerialReader {
@@ -47,7 +47,7 @@ public:
   void start();
   void stop();
 
-  create2_msgs::RoombaSensors status();
+  create2_msgs::Status status();
 };
 
 class create2::Command {
@@ -108,7 +108,7 @@ public:
   void clearCommands();
   void flushCommands();
 
-  create2_msgs::RoombaSensors getStatus();
+  create2_msgs::Status getStatus();
 };
 
 class create2::Create2 {
@@ -134,7 +134,7 @@ public:
   void drive(const short velocity, const short radius=0);
   void driveDirect(const short right, const short left);
 
-  create2_msgs::RoombaSensors getStatus();
+  create2_msgs::Status getStatus();
 
   void test();
   void testDrive();

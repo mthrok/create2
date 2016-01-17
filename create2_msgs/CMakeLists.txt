@@ -16,14 +16,14 @@ add_message_files(
   Battery.msg
   Request.msg
   IR_Opcodes.msg
-  RoombaCtrl.msg
   LightBumper.msg
   MotorCurrent.msg
-  RoombaSensors.msg
   EncoderCounts.msg
   ChargingSource.msg
   BumpsWheeldrops.msg
   WheelOvercurrents.msg
+  Status.msg
+  Control.msg
   )
 
 generate_messages(
