@@ -1,5 +1,5 @@
-#ifndef IROBOT_CREATE2_DRIVER_TYPES_HPP_
-#define IROBOT_CREATE2_DRIVER_TYPES_HPP_
+#ifndef CREATE2_DRIVER_TYPES_HPP
+#define CREATE2_DRIVER_TYPES_HPP
 
 namespace create2 {
   // Refer to
@@ -353,4 +353,4 @@ namespace create2 {
   };
 }; // namespace create2
 
-#endif // IROBOT_CREATE2_DRIVER_TYPES_HPP_
+#endif // CREATE2_DRIVER_TYPES_HPP

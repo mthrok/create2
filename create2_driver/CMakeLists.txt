@@ -9,7 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 catkin_package(
   INCLUDE_DIRS    include
-  LIBRARIES       create2_driver
+  LIBRARIES       create2
   CATKIN_DEPENDS  create2_msgs roscpp tf
   DEPENDS         system_lib boost_thread
 )
@@ -19,21 +19,21 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_library(create2_driver
+add_library(create2
   src/serial.cxx
+  src/create2.cxx
+)
+
+add_executable(create2_driver
   src/create2_driver.cxx
 )
 
-add_executable(create2_node
-  src/create2_node.cxx
-)
-
-add_dependencies(create2_node
+add_dependencies(create2_driver
   create2_msgs_generate_messages_cpp
 )
 
-target_link_libraries(create2_node
-  create2_driver
+target_link_libraries(create2_driver
+  create2
   boost_thread
   ${catkin_LIBRARIES}
 )
