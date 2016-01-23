@@ -36,35 +36,58 @@ void Create2JoystickControl::init() {
     ("/joy", 100, &Create2JoystickControl::callback, this);
 }
 
-void Create2JoystickControl::callback
-    (const sensor_msgs::JoyConstPtr& msg){
-  bool send = false;
+create2_msgs::Control genModeControl(
+    const bool passive, const bool safe, const bool full) {
   create2_msgs::Control ctrl;
-  if (msg->buttons[SELECT]) {
+  if (passive) {
     ctrl.mode = create2_msgs::Control::PASSIVE;
-    send = true;
     ROS_DEBUG_STREAM("PASSIVE mode");
-  }
-  if (msg->buttons[PAIRING]) {
+  } else if (safe) {
     ctrl.mode = create2_msgs::Control::SAFE;
-    send = true;
     ROS_DEBUG_STREAM("SAFE mode");
-  }
-  if (msg->buttons[START]) {
+  } else {
     ctrl.mode = create2_msgs::Control::FULL;
-    send = true;
     ROS_DEBUG_STREAM("FULL mode");
   }
-  if (msg->axes[LEFT_AXIS_FB] || msg->axes[RIGHT_AXIS_FB]) {
-    ctrl.mode = create2_msgs::Control::DRIVE;
-    ctrl.axis1 = (float)msg->axes[LEFT_AXIS_FB];
-    ctrl.axis2 = (float)msg->axes[RIGHT_AXIS_FB];
-    send = true;
-    ROS_DEBUG_STREAM(
-      "DRIVE:" << ctrl.axis1 << ", " << ctrl.axis2);
+  return ctrl;
+}
+
+create2_msgs::Control genDriveControl(float left, float right) {
+  float threshold = 0.5;
+  // Map [0.0, threshold] to 0.0 and [threshold, 1.0] to [0.0 - 1.0]
+  float sign_left = (left < 0.0)? -1.0 : 1.0;
+  float sign_right = (right < 0.0)? -1.0 : 1.0;
+  left = std::abs(left);
+  right = std::abs(right);
+  left = (left < threshold) ? 0.0 :
+    sign_left * (left - threshold) / (1.0 - threshold);
+  right = (right < threshold) ? 0.0 :
+    sign_right * (right - threshold) / (1.0 - threshold);
+
+  create2_msgs::Control ctrl;
+  ctrl.mode = create2_msgs::Control::DRIVE;
+  ctrl.left_axis = left;
+  ctrl.right_axis = right;
+  ROS_DEBUG_STREAM("DRIVE: "
+                   << "L = " << ctrl.left_axis << ", "
+                   << "R = " << ctrl.right_axis);
+  return ctrl;
+}
+
+void Create2JoystickControl::callback
+    (const sensor_msgs::JoyConstPtr& msg){
+  bool passive = msg->buttons[SELECT];
+  bool safe = msg->buttons[PAIRING];
+  bool full = msg->buttons[START];
+  if (passive || safe || full) {
+    pub_.publish(genModeControl(passive, safe, full));
+    return;
   }
-  if (send) {
-    pub_.publish(ctrl);
+  float left = msg->axes[LEFT_AXIS_FB];
+  float right = msg->axes[RIGHT_AXIS_FB];
+  if (left || right) {
+    pub_.publish(genDriveControl(left, right));
+    return;
   }
 }
 

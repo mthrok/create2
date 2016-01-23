@@ -368,7 +368,7 @@ void create2::SerialWriter::clearCommands() {
 void create2::SerialWriter::processCommand(const Command& command) {
   uint32_t size = command.size();
   const uint8_t* data = command.data();
-  std::cout << "command: " << (int)data[0] << std::endl;
+  // std::cout << "command: " << (int)data[0] << std::endl;
   if (serial_.write(data, size) != (int32_t) size) {
     std::cerr << "Failed to process: " << (int)data[0] << std::endl;
   }
@@ -497,6 +497,19 @@ void create2::Create2::driveDirect(const short right, const short left) {
     (uint8_t)(left & 0xff)
   };
   comm_.queueCommand(OC_DRIVE_DIRECT, data, 4);
+}
+
+void create2::Create2::drivePWM(const short right, const short left) {
+  /**
+     right/left: -255 ~ 255 [mm/s]
+   **/
+  uint8_t data[4] = {
+    (uint8_t)(right >> 8),
+    (uint8_t)(right & 0xff),
+    (uint8_t)(left >> 8),
+    (uint8_t)(left & 0xff)
+  };
+  comm_.queueCommand(OC_DRIVE_PWM, data, 4);
 }
 
 void create2::Create2::passive() {

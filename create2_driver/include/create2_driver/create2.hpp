@@ -136,6 +136,7 @@ public:
 
   void drive(const short velocity, const short radius=0);
   void driveDirect(const short right, const short left);
+  void drivePWM(const short right, const short left);
 
   create2_msgs::Status getStatus();
 

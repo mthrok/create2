@@ -22,8 +22,13 @@ void Create2Driver::run() {
 
   ros::Rate loop_rate(10);
   while(ros::ok()) {
-    // c2_.drive(30, 0);
-    pub_.publish(c2_.getStatus());
+    create2_msgs::Status status = c2_.getStatus();
+    pub_.publish(status);
+    std::cout
+      << "Request:"
+      << " V_l " << status.request.left_velocity
+      << " V_r " << status.request.right_velocity
+      << " [mm/s] " << std::endl;
     ros::spinOnce();
     loop_rate.sleep();
   }
@@ -34,21 +39,49 @@ void Create2Driver::callback
   switch (ctrl->mode) {
   case create2_msgs::Control::PASSIVE: {
     c2_.passive();
-    break;
+    return;
   }
   case create2_msgs::Control::SAFE: {
     c2_.safe();
-    break;
+    return;
   }
   case create2_msgs::Control::FULL: {
     c2_.full();
-    break;
+    return;
   }
   case create2_msgs::Control::DRIVE: {
-    short left = 500 * ctrl->axis1;
-    short right = 500 * ctrl->axis2;
+    create2_msgs::Status status = c2_.getStatus();
+    float left = 500.0 * ctrl->left_axis;
+    float right = 500.0 * ctrl->right_axis;
+    // Scale control vector so that its magnitude does not
+    // change too sudden.
+    float threshold = 30;
+    // One idea for making maneuver more smooth will be make
+    // this threshold value change dynamically based on request value.
+    // It will involve corner case where request velocity is 0
+    // So will be left as is for a while.
+    float left_req = status.request.left_velocity;
+    float right_req = status.request.right_velocity;
+
+    float mag = std::sqrt(left * left + right * right + 1);
+    float mag_req = std::sqrt(left_req * left_req + right_req * right_req + 1);
+    if (mag - mag_req > threshold) {
+      float scale = (mag_req + threshold) / mag;
+      ROS_DEBUG_STREAM("Scaling down: "
+        << "L: " << left << " -> " << left * scale << ", "
+        << "R: " << right << " -> " << right * scale);
+      left = left * scale;
+      right = right * scale;
+    } else if (mag_req - mag > threshold) {
+      float scale = (mag_req - threshold) / mag;
+      ROS_DEBUG_STREAM("Scaling up: "
+        << "L: " << left << " -> " << left * scale << ", "
+        << "R: " << right << " -> " << right * scale);
+      left = left * scale;
+      right = right * scale;
+    }
     c2_.driveDirect(right, left);
-    break;
+    return;
   }
   default: {
     std::cout << "Action Not implemented." << std::endl;
