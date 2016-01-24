@@ -3,10 +3,15 @@ project(create2_joystick_control)
 
 find_package(catkin REQUIRED COMPONENTS
   create2_msgs
+  roslaunch
   joy
 )
 
-catkin_package()
+roslaunch_add_file_check(launch)
+
+catkin_package(
+  CATKIN_DEPENDS create2_msgs
+)
 
 include_directories(
   ${catkin_INCLUDE_DIRS}

@@ -1,0 +1,9 @@
+<launch>
+  <node name="joy" pkg="joy" type="joy_node"/>
+  <node name="create2_control"
+        pkg="create2_joystick_control"
+        type="create2_joystick_control"/>
+  <node name="create2_driver"
+        pkg="create2_driver"
+        type="create2_driver"/>
+</launch>

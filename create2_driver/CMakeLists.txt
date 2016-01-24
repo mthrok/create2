@@ -3,6 +3,7 @@ project(create2_driver)
 
 find_package(catkin REQUIRED COMPONENTS
   create2_msgs
+  roslaunch
   roscpp
   tf
 )
@@ -10,8 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS    include
   LIBRARIES       create2
-  CATKIN_DEPENDS  create2_msgs roscpp tf
-  DEPENDS         system_lib boost_thread
+  CATKIN_DEPENDS  create2_msgs roscpp
 )
 
 include_directories(
@@ -34,6 +34,5 @@ add_dependencies(create2_driver
 
 target_link_libraries(create2_driver
   create2
-  boost_thread
   ${catkin_LIBRARIES}
 )
